@@ -1,14 +1,12 @@
-#[allow(dead_code)]
-
-use volatile::Volatile;
 use core::fmt;
 use lazy_static::lazy_static;
 use spin::Mutex;
-
+#[allow(dead_code)]
+use volatile::Volatile;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum Color {
+enum Color {
     Black = 0,
     Blue,
     Green,
@@ -24,7 +22,7 @@ pub enum Color {
     LightRed,
     Pink,
     Yellow,
-    White
+    White,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,7 +39,7 @@ impl ColorCode {
 #[repr(C)]
 struct ScreenChar {
     ch: u8,
-    color_code: ColorCode
+    color_code: ColorCode,
 }
 
 const BUFFER_HEIGHT: usize = 25;
@@ -49,13 +47,13 @@ const BUFFER_WIDTH: usize = 80;
 
 #[repr(transparent)]
 struct Buffer {
-    chars: [[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT]
+    chars: [[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
 }
 
 pub struct Writer {
     column_pos: usize,
     color_code: ColorCode,
-    buffer: &'static mut Buffer
+    buffer: &'static mut Buffer,
 }
 
 impl Writer {
@@ -70,7 +68,7 @@ impl Writer {
                 let c = self.column_pos;
                 self.buffer.chars[r][c].write(ScreenChar {
                     ch: byte,
-                    color_code: self.color_code
+                    color_code: self.color_code,
                 });
                 self.column_pos += 1;
             }
@@ -81,7 +79,7 @@ impl Writer {
         for byte in s.bytes() {
             match byte {
                 0x20..=0x7e | b'\n' => self.write_byte(byte),
-                _ => self.write_byte(0xfe)
+                _ => self.write_byte(0xfe),
             }
         }
     }
@@ -100,7 +98,7 @@ impl Writer {
     fn clear_row(&mut self, row: usize) {
         let whitespace = ScreenChar {
             ch: b' ',
-            color_code: self.color_code
+            color_code: self.color_code,
         };
         for i in 0..BUFFER_WIDTH {
             self.buffer.chars[row][i].write(whitespace);
@@ -154,4 +152,14 @@ macro_rules! println {
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
     WRITER.lock().write_fmt(args).unwrap();
+}
+
+#[test_case]
+fn test_println_output() {
+    let s = "Some test string that fits on a single line";
+    println!("{}", s);
+    for (i, ch) in s.chars().enumerate() {
+        let temp = WRITER.lock().buffer.chars[BUFFER_HEIGHT - 2][i].read();
+        assert_eq!(char::from(temp.ch), ch);
+    }
 }
