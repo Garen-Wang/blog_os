@@ -1,11 +1,11 @@
 use core::fmt;
 use lazy_static::lazy_static;
 use spin::Mutex;
-#[allow(dead_code)]
 use volatile::Volatile;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
+#[allow(dead_code)]
 enum Color {
     Black = 0,
     Blue,
