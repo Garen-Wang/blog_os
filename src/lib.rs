@@ -3,9 +3,11 @@
 #![feature(custom_test_frameworks)]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
+#![feature(abi_x86_interrupt)]
 
 pub mod serial;
 pub mod vga_buffer;
+pub mod interrupts;
 
 use core::panic::PanicInfo;
 
@@ -55,6 +57,7 @@ pub fn test_panic_handler(_info: &PanicInfo) -> ! {
 #[cfg(test)]
 #[no_mangle]
 extern "C" fn _start() -> ! {
+    init();
     test_main();
     loop {}
 }
@@ -63,5 +66,14 @@ extern "C" fn _start() -> ! {
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     test_panic_handler(_info)
+}
+
+pub fn init() {
+    interrupts::init_idt();
+}
+
+#[test_case]
+fn test_breakpoint_exception() {
+    x86_64::instructions::interrupts::int3();
 }
 
