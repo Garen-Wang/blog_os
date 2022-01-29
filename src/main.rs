@@ -6,6 +6,7 @@
 
 use core::panic::PanicInfo;
 use blog_os::println;
+use x86_64::registers::control::Cr3;
 
 #[no_mangle]
 extern "C" fn _start() -> ! {
@@ -15,30 +16,20 @@ extern "C" fn _start() -> ! {
 
     /*
      *unsafe {
-     *    *(0xdeadbeef as *mut u64) = 42;
+     *    let x = *(0x205354 as *mut u32);
+     *    println!("read worked: {}", x);
+     *    *(0x205354 as *mut u32) = 42;
+     *    println!("write worked: {}", *(0x205354 as *mut u32));
      *}
      */
-    
-/*
- *    #[allow(unconditional_recursion)]
- *    fn stack_overflow() {
- *        stack_overflow();
- *    }
- *
- *    stack_overflow();
- */
-
+    let (level_4_page_table, _) = Cr3::read();
+    println!("Level 4 page table at :{:#?}", level_4_page_table.start_address());
 
     #[cfg(test)]
     test_main();
 
     println!("It did not crash!");
     blog_os::hlt_loop();
-    /*
-     *loop {
-     *    print!("-");
-     *}
-     */
 }
 
 #[cfg(not(test))]
