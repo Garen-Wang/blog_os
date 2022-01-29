@@ -52,7 +52,7 @@ pub fn test_panic_handler(_info: &PanicInfo) -> ! {
     serial_println!("[failed]");
     serial_println!("Error: {}", _info);
     exit_qemu(QemuExitCode::Failed);
-    loop {}
+    hlt_loop()
 }
 
 #[cfg(test)]
@@ -60,7 +60,7 @@ pub fn test_panic_handler(_info: &PanicInfo) -> ! {
 extern "C" fn _start() -> ! {
     init();
     test_main();
-    loop {}
+    hlt_loop()
 }
 
 #[cfg(test)]
@@ -72,6 +72,10 @@ fn panic(_info: &PanicInfo) -> ! {
 pub fn init() {
     gdt::init();
     interrupts::init_idt();
+    unsafe {
+        interrupts::PICS.lock().initialize();
+    }
+    x86_64::instructions::interrupts::enable();
 }
 
 #[test_case]
@@ -79,3 +83,8 @@ fn test_breakpoint_exception() {
     x86_64::instructions::interrupts::int3();
 }
 
+pub fn hlt_loop() -> ! {
+    loop {
+        x86_64::instructions::hlt();
+    }
+}

@@ -19,25 +19,33 @@ extern "C" fn _start() -> ! {
      *}
      */
     
-    #[allow(unconditional_recursion)]
-    fn stack_overflow() {
-        stack_overflow();
-    }
+/*
+ *    #[allow(unconditional_recursion)]
+ *    fn stack_overflow() {
+ *        stack_overflow();
+ *    }
+ *
+ *    stack_overflow();
+ */
 
-    stack_overflow();
 
     #[cfg(test)]
     test_main();
 
     println!("It did not crash!");
-    loop {}
+    blog_os::hlt_loop();
+    /*
+     *loop {
+     *    print!("-");
+     *}
+     */
 }
 
 #[cfg(not(test))]
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     println!("{}", _info);
-    loop {}
+    blog_os::hlt_loop()
 }
 
 #[cfg(test)]
