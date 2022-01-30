@@ -5,25 +5,70 @@
 #![reexport_test_harness_main = "test_main"]
 
 use core::panic::PanicInfo;
-use blog_os::println;
-use x86_64::registers::control::Cr3;
+use blog_os::{println, memory::{create_example_mapping, BootInfoFrameAllocator}};
+use bootloader::{BootInfo, entry_point};
+use x86_64::{VirtAddr, structures::paging::Page};
 
-#[no_mangle]
-extern "C" fn _start() -> ! {
+entry_point!(kernel_main);
+
+fn kernel_main(boot_info: &'static BootInfo) -> ! {
     println!("Hello world{}", "!");
 
     blog_os::init();
 
+    let physical_memory_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    let mut mapper = unsafe { blog_os::memory::init(physical_memory_offset) };
+    let mut frame_allocator = BootInfoFrameAllocator::init(&boot_info.memory_map);
+
+    let page = Page::containing_address(VirtAddr::new(0));
+    create_example_mapping(page, &mut mapper, &mut frame_allocator);
+
+    let page_ptr: *mut u64 = page.start_address().as_mut_ptr();
+    unsafe {
+        page_ptr.offset(400).write_volatile(0x_f021_f077_f065_f04e);
+    }
+
     /*
-     *unsafe {
-     *    let x = *(0x205354 as *mut u32);
-     *    println!("read worked: {}", x);
-     *    *(0x205354 as *mut u32) = 42;
-     *    println!("write worked: {}", *(0x205354 as *mut u32));
+     *let physical_memory_offset = VirtAddr::new(boot_info.physical_memory_offset);
+     *let mapper = unsafe { blog_os::memory::init(physical_memory_offset) };
+     *let addrs = [
+     *    0xb8000,
+     *    0x201008,
+     *    0x0100_0020_1a10,
+     *    boot_info.physical_memory_offset
+     *];
+     *for addr in addrs {
+     *    let virtual_addr = VirtAddr::new(addr);
+     *    //let physical_addr = unsafe {translate_addr(virtual_addr, physical_memory_offset)};
+     *    let physical_addr = mapper.translate_addr(virtual_addr);
+     *    println!("{:?} -> {:?}", virtual_addr, physical_addr);
      *}
      */
-    let (level_4_page_table, _) = Cr3::read();
-    println!("Level 4 page table at :{:#?}", level_4_page_table.start_address());
+
+    /*
+     *let physical_memory_offset = VirtAddr::new(boot_info.physical_memory_offset);
+     *let l4_table = unsafe {
+     *    active_level_4_table(physical_memory_offset)
+     *};
+     *for (i, entry) in l4_table.iter().enumerate() {
+     *    if !entry.is_unused() {
+     *        println!("L4 entry {}: {:#?}", i, entry);
+     *        let physical_addr = entry.frame().unwrap().start_address();
+     *        let virtual_addr = physical_memory_offset + physical_addr.as_u64();
+     *        let l3_table = unsafe {
+     *            let l3_table_ptr: *mut PageTable = virtual_addr.as_mut_ptr();
+     *            &*l3_table_ptr
+     *        };
+     *        
+     *        for (i, entry) in l3_table.iter().enumerate() {
+     *            if !entry.is_unused() {
+     *                println!("L3 entry {}: {:#?}", i, entry);
+     *            }
+     *        }
+     *    }
+     *}
+     */
+
 
     #[cfg(test)]
     test_main();
@@ -31,6 +76,13 @@ extern "C" fn _start() -> ! {
     println!("It did not crash!");
     blog_os::hlt_loop();
 }
+
+/*
+ *#[no_mangle]
+ *extern "C" fn _start() -> ! {
+ *
+ *}
+ */
 
 #[cfg(not(test))]
 #[panic_handler]
