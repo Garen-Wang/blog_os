@@ -1,10 +1,18 @@
-use core::{alloc::{GlobalAlloc, Layout}, ptr::null_mut};
+pub mod bump;
+pub mod linked_list;
+pub mod fixed_size_block;
 
-use linked_list_allocator::LockedHeap;
+use core::{alloc::{GlobalAlloc, Layout}, ptr::null_mut};
+//use linked_list_allocator::LockedHeap;
 use x86_64::{VirtAddr, structures::paging::{Page, Size4KiB, FrameAllocator, mapper::MapToError, PageTableFlags, Mapper}};
 
+use self::{bump::Locked, fixed_size_block::FixedSizeBlockAllocator};
+
 #[global_allocator]
-static ALLOCATOR: LockedHeap = LockedHeap::empty();
+//static ALLOCATOR: Dummy = Dummy;
+//static ALLOCATOR: Locked<BumpAllocator> = Locked::new(BumpAllocator::new());
+//static ALLOCATOR: Locked<LinkedListAllocator> = Locked::new(LinkedListAllocator::new());
+static ALLOCATOR: Locked<FixedSizeBlockAllocator> = Locked::new(FixedSizeBlockAllocator::new());
 
 pub struct Dummy;
 
@@ -48,3 +56,10 @@ pub fn init_heap(
     Ok(())
 }
 
+fn align_up(addr: usize, align: usize) -> usize {
+    /*
+     *let remainder = addr % align;
+     *if remainder == 0 { addr } else { addr - remainder + align }
+     */
+    (addr + align - 1) & !(align - 1)
+}
