@@ -4,8 +4,11 @@
 #![test_runner(blog_os::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
+extern crate alloc;
+
 use core::panic::PanicInfo;
-use blog_os::{println, memory::{create_example_mapping, BootInfoFrameAllocator}};
+use alloc::{boxed::Box, vec::Vec, rc::Rc, vec};
+use blog_os::{println, memory::{create_example_mapping, BootInfoFrameAllocator}, allocator};
 use bootloader::{BootInfo, entry_point};
 use x86_64::{VirtAddr, structures::paging::Page};
 
@@ -27,6 +30,25 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     unsafe {
         page_ptr.offset(400).write_volatile(0x_f021_f077_f065_f04e);
     }
+
+    allocator::init_heap(&mut mapper, &mut frame_allocator)
+        .expect("heap initialization failed");
+    
+    let heap_value = Box::new(41);
+    println!("heap_value at {:p}", heap_value);
+
+    let mut vec = Vec::new();
+    for i in 0..500 {
+        vec.push(i);
+    }
+    println!("vec at {:p}", vec.as_slice());
+
+    let rc = Rc::new(vec![1, 2, 3]);
+    let cloned_rc = rc.clone();
+    println!("rc is {}", Rc::strong_count(&cloned_rc));
+    drop(rc);
+    println!("rc is {}", Rc::strong_count(&cloned_rc));
+
 
     /*
      *let physical_memory_offset = VirtAddr::new(boot_info.physical_memory_offset);
