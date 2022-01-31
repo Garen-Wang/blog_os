@@ -1,4 +1,4 @@
-use pc_keyboard::{Keyboard, layouts::Us104Key, ScancodeSet1, HandleControl, DecodedKey};
+use pc_keyboard::{Keyboard, layouts::Us104Key, ScancodeSet1, HandleControl};
 use x86_64::{structures::idt::{self, PageFaultErrorCode}, instructions::port::Port, registers::control::Cr2};
 use crate::{print, println, gdt, hlt_loop};
 use lazy_static::lazy_static;
@@ -81,9 +81,10 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(
                 HandleControl::Ignore)
         );
     }
-    let mut keyboard = KEYBOARD.lock();
+    // let mut keyboard = KEYBOARD.lock();
     let mut port: Port<u8> = Port::new(0x60);
     let scan_code = unsafe { port.read() };
+    crate::task::keyboard::add_scancode(scan_code);
 
     /*
      *let key = match scan_code {
@@ -97,14 +98,15 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(
      *}
      */
 
-    if let Ok(Some(key_event)) = keyboard.add_byte(scan_code) {
-        if let Some(decoded_key) = keyboard.process_keyevent(key_event) {
-            match decoded_key {
-                DecodedKey::Unicode(ch) => print!("{}", ch),
-                DecodedKey::RawKey(key) => print!("{:#?}", key)
-            }
-        }
-    }
+    // if let Ok(Some(key_event)) = keyboard.add_byte(scan_code) {
+    //     if let Some(decoded_key) = keyboard.process_keyevent(key_event) {
+    //         match decoded_key {
+    //             DecodedKey::Unicode(ch) => print!("{}", ch),
+    //             DecodedKey::RawKey(key) => print!("{:#?}", key)
+    //         }
+    //     }
+    // }
+
     unsafe {
         PICS.lock().notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
     }

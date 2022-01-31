@@ -7,10 +7,9 @@
 extern crate alloc;
 
 use core::panic::PanicInfo;
-use alloc::{boxed::Box, vec::Vec, rc::Rc, vec};
-use blog_os::{println, memory::{create_example_mapping, BootInfoFrameAllocator}, allocator};
+use blog_os::{println, memory::BootInfoFrameAllocator, allocator, task::{Task, self, executor::Executor}};
 use bootloader::{BootInfo, entry_point};
-use x86_64::{VirtAddr, structures::paging::Page};
+use x86_64::VirtAddr;
 
 entry_point!(kernel_main);
 
@@ -23,88 +22,16 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     let mut mapper = unsafe { blog_os::memory::init(physical_memory_offset) };
     let mut frame_allocator = BootInfoFrameAllocator::init(&boot_info.memory_map);
 
-    let page = Page::containing_address(VirtAddr::new(0));
-    create_example_mapping(page, &mut mapper, &mut frame_allocator);
-
-    let page_ptr: *mut u64 = page.start_address().as_mut_ptr();
-    unsafe {
-        page_ptr.offset(400).write_volatile(0x_f021_f077_f065_f04e);
-    }
-
     allocator::init_heap(&mut mapper, &mut frame_allocator)
         .expect("heap initialization failed");
-    
-    let heap_value = Box::new(41);
-    println!("heap_value at {:p}", heap_value);
 
-    let mut vec = Vec::new();
-    for i in 0..500 {
-        vec.push(i);
-    }
-    println!("vec at {:p}", vec.as_slice());
+    // let mut executor = SimpleExecutor::new();
+    let mut executor = Executor::new();
+    executor.spawn(Task::new(example_task()));
+    executor.spawn(Task::new(task::keyboard::print_keypresses()));
 
-    let rc = Rc::new(vec![1, 2, 3]);
-    let cloned_rc = rc.clone();
-    println!("rc is {}", Rc::strong_count(&cloned_rc));
-    drop(rc);
-    println!("rc is {}", Rc::strong_count(&cloned_rc));
-
-
-    /*
-     *let physical_memory_offset = VirtAddr::new(boot_info.physical_memory_offset);
-     *let mapper = unsafe { blog_os::memory::init(physical_memory_offset) };
-     *let addrs = [
-     *    0xb8000,
-     *    0x201008,
-     *    0x0100_0020_1a10,
-     *    boot_info.physical_memory_offset
-     *];
-     *for addr in addrs {
-     *    let virtual_addr = VirtAddr::new(addr);
-     *    //let physical_addr = unsafe {translate_addr(virtual_addr, physical_memory_offset)};
-     *    let physical_addr = mapper.translate_addr(virtual_addr);
-     *    println!("{:?} -> {:?}", virtual_addr, physical_addr);
-     *}
-     */
-
-    /*
-     *let physical_memory_offset = VirtAddr::new(boot_info.physical_memory_offset);
-     *let l4_table = unsafe {
-     *    active_level_4_table(physical_memory_offset)
-     *};
-     *for (i, entry) in l4_table.iter().enumerate() {
-     *    if !entry.is_unused() {
-     *        println!("L4 entry {}: {:#?}", i, entry);
-     *        let physical_addr = entry.frame().unwrap().start_address();
-     *        let virtual_addr = physical_memory_offset + physical_addr.as_u64();
-     *        let l3_table = unsafe {
-     *            let l3_table_ptr: *mut PageTable = virtual_addr.as_mut_ptr();
-     *            &*l3_table_ptr
-     *        };
-     *        
-     *        for (i, entry) in l3_table.iter().enumerate() {
-     *            if !entry.is_unused() {
-     *                println!("L3 entry {}: {:#?}", i, entry);
-     *            }
-     *        }
-     *    }
-     *}
-     */
-
-
-    #[cfg(test)]
-    test_main();
-
-    println!("It did not crash!");
-    blog_os::hlt_loop();
+    executor.run();
 }
-
-/*
- *#[no_mangle]
- *extern "C" fn _start() -> ! {
- *
- *}
- */
 
 #[cfg(not(test))]
 #[panic_handler]
@@ -122,4 +49,13 @@ fn panic(_info: &PanicInfo) -> ! {
 #[test_case]
 fn simple_unit_test() {
     assert_eq!(1, 1);
+}
+
+async fn async_number() -> u32 {
+    42
+}
+
+async fn example_task() {
+    let number = async_number().await;
+    println!("async_number: {}", number);
 }
